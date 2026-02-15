@@ -1,1 +1,1 @@
-# Major_Project_Kriya_BF
+IN the before_norm.ipynb file i have first read the dataset and print the first five rows of dataset using head() function next i have find the missing values column names by using isnull().sum() function and predicted the model accuracy by considering one hidden layer with 50 neurons once and 2 hidden layers with 50, 30 neurons. when i have considered 50,30 neruons with 2 hidden layers i got more accuracy so i choose 2 hidden layers to train the model using mlp classifier. 
