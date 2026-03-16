@@ -1,201 +1,194 @@
-# Physics-Informed Neural Networks (PINNs) for Sediment Transport and Bedform Classification
+# Main Task-1: PINN + XGBoost Hybrid Project
 
-## 🌊 Project Overview
-This project implements two Physics-Informed Neural Network approaches for sediment transport modeling and bedform classification, combining data-driven learning with fundamental sediment transport physics.
+## 1) Project Summary
+This folder implements `PINN_Fixed_Hybrid.py`, a production-style hybrid ML pipeline that combines:
+- A Physics-Informed Neural Network (PINN) using PyTorch
+- An XGBoost classifier
+- A weighted ensemble to improve robustness
 
-## 📁 Implementation Variants
-
-### 1. PINN.py - Basic Implementation
-**Purpose**: Simple PINN with basic physics constraints  
-**Data Source**: External dataset (`Dataset (Task-2).xlsx`)  
-**Approach**: Minimal physics integration with existing data
-
-### 2. PINN_physics_based.py - Advanced Implementation
-**Purpose**: Comprehensive physics-informed modeling  
-**Data Source**: Physics-based synthetic data generation  
-**Approach**: Full sediment transport physics integration
+Goal: classify river bed forms from `Dataset (Task-2).xlsx`, preserving minority classes and adding physics constraints.
 
 ---
 
-## 🔬 PINN.py - Basic Implementation
-
-### Dataset
-- **File**: `Dataset (Task-2).xlsx`
-- **Features**: 6 input features
-  - `I`: Flow type indicator (-1 for flume, 1 for natural)
-  - `Fr`: Froude number (flow regime)
-  - `tau_b_star`: Shields parameter (dimensionless shear stress)
-  - `Y_star`: Dimensionless flow depth
-  - `d_star`: Dimensionless particle size
-  - `G`: Sediment gradation coefficient
-- **Target**: Bed form classification (6 classes after remapping)
-
-### Model Architecture
-- **Type**: 3-layer feedforward neural network
-- **Hidden Layers**: 2 layers with 64 neurons each
-- **Activation**: Tanh
-- **Output**: 6 classes
-
-### Physics Constraints
-1. **Shields Parameter**: `τ_b* > 0.05` (minimum shear stress)
-2. **Froude Number**: `Fr < 2.0` (flow regime limit)
-3. **Particle Size**: `d_star > 1.0` (minimum grain size)
-
----
-
-## 🌊 PINN_physics_based.py - Advanced Implementation
-
-### Comprehensive Physics Integration
-
-#### Core Physical Parameters
-- **Shields Parameter (θ)**: Dimensionless bed shear stress
-- **Particle Reynolds Number**: Flow-particle interaction
-- **Froude Number**: Flow regime classification
-- **Dimensionless Grain Size (D*)**: Fundamental sediment parameter
-
-#### Advanced Physics Models
-1. **Hjulström-Sundborg Relationships**
-   - Critical velocity for sediment entrainment
-   - Grain size dependent erosion/deposition
-
-2. **Van Rijn Bed Form Classification**
-   - Physics-based bed form prediction
-   - Multi-parameter classification logic
-   - Accounts for flow intensity and grain size
-
-3. **Sediment Transport Physics**
-   - Continuity and momentum conservation
-   - Physical consistency constraints
-   - Multi-physics loss function
-
-### Model Architecture
-- **Type**: 4-layer deep neural network
-- **Architecture**: 128 → 128 → 64 → 4 neurons
-- **Regularization**: Dropout (0.1)
-- **Activation**: Tanh (physics-friendly)
-- **Output**: 4 bed form classes
-
-### Physics-Informed Loss Function
-```python
-Total_Loss = Data_Loss + λ_physics × Physics_Loss
+## 2) Project Structure (IT Standards)
+```
+Main Task-1/
+  ├─ PINN_Fixed_Hybrid.py   # Main hybrid training/evaluation code
+  ├─ Dataset (Task-2).xlsx  # Input dataset (keep local)
+  └─ README.md             # This documentation
 ```
 
-**Physics Loss Components**:
-1. Shields parameter constraints
-2. Froude number bounds
-3. Critical velocity relationships
-4. Bed form transition physics
-5. Flow continuity conservation
-
-### Synthetic Data Generation
-- **Physics-based sampling**: Realistic parameter ranges
-- **Dependent variable calculation**: Manning's equation for shear stress
-- **Noise injection**: Realistic variability
-- **Sample size**: 4000 training, 1000 test samples
+### Coding & design standards used
+- Single-file end-to-end pipeline for quick research reproducibility.
+- Modular helper functions with clear responsibilities.
+- Explicit seed-setting for reproducibility.
+- Logging/prints for dataset, training progress, and metrics.
+- Class imbalance-safe split and class-weight handling.
 
 ---
 
-## 📊 Comparison Matrix
+## 3) How the code works
+### 3.1 Data preprocessing
+1. Load dataset from Excel.
+2. Add synthetic feature `I` with values -1 (first 1312 rows) and 1 (remaining rows).
+3. Use selected features: `I`, `Fr`, `tau_b_star`, `Y_star`, `d_star`, `G`.
+4. Normalize feature values with `StandardScaler`.
+5. Convert labels from `Bed form` to zero-based numeric classes.
 
-| Feature | PINN.py | PINN_physics_based.py |
-|---------|---------|----------------------|
-| **Complexity** | ✅ Simple | ⚠️ Advanced |
-| **Physics Integration** | ❌ Basic (3 constraints) | ✅ Comprehensive (15+ relationships) |
-| **Data Source** | ❌ External dataset required | ✅ Physics-based generation |
-| **Architecture** | 3-layer (64 neurons) | 4-layer (128→64 neurons) |
-| **Training Speed** | ✅ Fast | ⚠️ Moderate |
-| **Generalization** | ❌ Limited to dataset | ✅ Physics-constrained |
-| **Scientific Accuracy** | ❌ Minimal | ✅ High |
-| **Use Case** | Learning/Prototyping | Production/Research |
+### 3.2 Minority-safe split
+`safe_train_test_split()` does:
+- Identify single-sample classes.
+- Keep singleton class instances in training (to prevent stratify errors).
+- Stratified split for multi-sample classes where possible.
+
+### 3.3 Physics-informed neural network (PINN)
+- `PINN(nn.Module)` architecture: Linear-Tanh-Dropout-Linear-Tanh-Dropout-Linear.
+- Additional physics loss constraints (ReLU penalties):
+  - `tau_b_star` >= 0.05
+  - `Fr` <= 2.0
+  - `d_star` >= 1.0
+  - `Y_star` >= 0.1
+- Total loss: cross-entropy + lambda * physics_loss.
+
+### 3.4 Enhanced XGBoost
+- Uses `XGBClassifier` with regularization/hyperparameters.
+- Computes sample weights from class weights to account for imbalance.
+
+### 3.5 Weighted ensemble
+- Combines PINN softmax output and XGBoost probabilities.
+- Default weight: 40% PINN, 60% XGBoost.
+
+### 3.6 Evaluation
+- Evaluates each method with macro F1, accuracy, and classification report.
+- Prints XGBoost feature importance ranking.
+- Chooses best model by highest macro F1.
 
 ---
 
-## 🚀 Usage
-
-### Basic Implementation
+## 4) How to run (dev/test)
+1. Open terminal in `Main Task-1`.
+2. Install dependencies (example):
 ```bash
-python PINN.py
+pip install pandas numpy torch scikit-learn xgboost openpyxl
 ```
-
-### Advanced Physics-Based Implementation
+3. Run:
 ```bash
-python PINN_physics_based.py
+py PINN_Fixed_Hybrid.py
 ```
+4. Inspect logs and final model performance summary.
 
 ---
 
-## 📈 Output Metrics
+## 5) Current run results (from latest execution)
+### Dataset summary
+- Total samples: 2548
+- Features: 6
+- Classes: 4
+- Class distribution: 2447, 97, 3, 1
 
-### Both Implementations Provide:
-- Training progress monitoring
-- Classification reports (precision, recall, F1-score)
-- Confusion matrices
-- Test accuracy
-- Physics loss tracking (advanced version)
+### Safe split
+- Train: 1957, 78, 2, 1
+- Test: 490, 19, 1
 
-### Advanced Implementation Additional Outputs:
-- Physics parameter validation
-- Bed form transition analysis
-- Sediment transport regime classification
-- Physical consistency metrics
+### Model performance
+| Model | Macro F1 | Weighted F1 | Accuracy | Test Support |
+|---|---|---|---|---|
+| Enhanced PINN | 0.9214 | 0.98 | 0.9784 | 510 |
+| Enhanced XGBoost | 0.6581 | 1.00 | 0.9980 | 510 |
+| Weighted Ensemble | 0.6581 | 1.00 | 0.9980 | 510 |
 
----
+- Best: Enhanced PINN
 
-## 🛠️ Dependencies
-
-```txt
-torch>=1.9.0
-numpy>=1.21.0
-pandas>=1.3.0
-scikit-learn>=1.0.0
-matplotlib>=3.4.0
-openpyxl>=3.0.0
-```
-
----
-
-## 🎯 Recommendations
-
-### For Learning & Experimentation:
-**Use PINN.py**
-- Simple to understand and modify
-- Quick prototyping
-- Basic PINN concept demonstration
-
-### For Research & Production:
-**Use PINN_physics_based.py**
-- Scientifically accurate sediment transport modeling
-- Comprehensive physics integration
-- Better generalization to new conditions
-- Suitable for engineering applications
-
-### Hybrid Approach:
-Combine the architectural simplicity of PINN.py with selected physics components from PINN_physics_based.py for balanced complexity and performance.
+### Feature importance (XGBoost)
+1. `Fr` (50.25%)
+2. `tau_b_star` (14.95%)
+3. `d_star` (14.02%)
+4. `Y_star` (13.61%)
+5. `I` (7.17%)
+6. `G` (0.00%)
 
 ---
 
-## 🔬 Scientific Foundation
+## 8) Evaluation parameters (model hyperparameters)
 
-The advanced implementation incorporates established sediment transport theory:
-- **Shields (1936)**: Critical shear stress theory
-- **Hjulström-Sundborg**: Velocity-grain size relationships
-- **Van Rijn (1984)**: Bed form classification system
-- **Manning's Equation**: Flow resistance relationships
+### 8.1 Shared training settings
+- Random seed: 42 (NumPy and PyTorch)
+- Test size: 20% (safe stratified split)
+- Label mapping: zero-based from unique classes
+
+### 8.2 Enhanced PINN configuration
+- Input dim: 6
+- Hidden dim: 128
+- Output dim: number of unique classes
+- Architecture: Linear -> Tanh -> Dropout(0.2) -> Linear -> Tanh -> Dropout(0.2) -> Linear
+- Loss: `CrossEntropyLoss(weight=class_weights)` + physics penalty
+- Physics constraints:
+  - `tau_b_star >= 0.05`
+  - `Fr <= 2.0`
+  - `d_star >= 1.0`
+  - `Y_star >= 0.1`
+- Physics weight (`lambda_physics`): 0.15
+- Optimizer: `AdamW` (lr=0.001, weight_decay=1e-4)
+- LR scheduler: `ReduceLROnPlateau` (patience=20, factor=0.7)
+- Early stopping: patience=40 epochs
+- Training epochs: up to 250
+- Gradient clipping: max_norm=1.0
+
+### 8.3 Enhanced XGBoost configuration
+- Model: `xgb.XGBClassifier`
+- n_estimators: 200
+- max_depth: 6
+- learning_rate: 0.1
+- subsample: 0.8
+- colsample_bytree: 0.8
+- reg_alpha: 0.1
+- reg_lambda: 0.1
+- scale_pos_weight: mean sample weights
+- random_state: 42
+- n_jobs: -1
+- eval_metric: `mlogloss`
+- sample weights: based on balanced class weights from training labels
+
+### 8.4 Ensemble settings
+- Weighted combination of predicted class probabilities:
+  - PINN weight: 0.4
+  - XGBoost weight: 0.6
+
+### 8.5 Evaluation metrics reported
+- Macro F1 score
+- Accuracy
+- Classification report (precision, recall, f1-score, support)
+- Feature importance ranking (XGBoost)
 
 ---
 
-## 📝 Key Features
+## 9) IT project standards and best practices
+- Keep dataset and code in the same folder for local experiments.
+- Use `requirements.txt` in future for dependency management.
+- Use Azure/GitHub CI for reproducible runs and quality checks.
+- For production, separate model training, evaluation, and inference into modules.
 
-### PINN.py Features:
-1. ✅ Simple physics-informed learning
-2. ✅ Class imbalance handling
-3. ✅ Automatic class remapping
-4. ✅ Comprehensive evaluation metrics
+### Suggested next improvements
+- Add `requirements.txt` and `venv` support.
+- Add unit tests for `safe_train_test_split` and physics constraints.
+- Add a script for prediction/inference and one for hyperparameter tuning.
+- Log results to a CSV/JSON for experiment tracking.
 
-### PINN_physics_based.py Features:
-1. 🌊 Advanced sediment transport physics
-2. 🔬 Synthetic data generation
-3. 📊 Multi-physics loss optimization
-4. 🎯 Van Rijn bed form classification
-5. ⚖️ Physical consistency validation
-6. 🚀 Deep architecture with regularization
+- Keep dataset and code in the same folder for local experiments.
+- Use `requirements.txt` in future for dependency management.
+- Use Azure/GitHub CI for reproducible runs and quality checks.
+- For production, separate model training, evaluation, and inference into modules.
+
+### Suggested next improvements
+- Add `requirements.txt` and `venv` support.
+- Add unit tests for `safe_train_test_split` and physics constraints.
+- Add a script for prediction/inference and one for hyperparameter tuning.
+- Log results to a CSV/JSON for experiment tracking.
+
+---
+
+## 7) Quick troubleshooting
+- If split fails due to single-sample classes, verify class counts before split.
+- If XGBoost shows `ValueError: n_classes` mismatch, re-open and ensure the same label mapping is used across train/test.
+- If model underperforms, try adjusting `lambda_physics`, hidden layers, or XGBoost hyperparameters.
+
